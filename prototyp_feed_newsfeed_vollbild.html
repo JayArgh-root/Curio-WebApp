@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prototyp — News Feed (gemischter Strom)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,ital@9..144,340..600,0..1&family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink: #12213A;
+    --ink-deep: #0A1524;
+    --parchment: #F3EAD8;
+    --parchment-edge: #E3D5B7;
+    --brass: #B8925A;
+    --brass-bright: #D3A868;
+    --charcoal: #241F18;
+    --charcoal-soft: #6B6152;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--ink);
+    font-family: 'Libre Franklin', sans-serif;
+    overflow: hidden;
+  }
+
+  .screen { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; background: var(--ink); overflow: hidden; }
+
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 148px; height: 26px; background: #060B14; border-radius: 0 0 18px 18px; z-index: 40;
+  }
+  .home-indicator{
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 4px; border-radius: 3px; background: rgba(200, 190, 170, 0.35); z-index: 40;
+  }
+
+  .views-wrap { position: absolute; inset: 0; }
+  .view { position: absolute; inset: 0; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.22s ease; }
+  .view.active { opacity: 1; pointer-events: auto; z-index: 2; }
+  #view-overview { background: var(--ink); }
+  #view-card { background: var(--ink); }
+  #view-summary, #view-fulltext { background: var(--parchment); }
+
+  /* ---------- Übersichtsseite ---------- */
+  .ov-content { flex: 1; overflow-y: auto; padding: 0 16px 20px 16px; }
+  .ov-hero-tile {
+    height: 367px; margin-bottom: 12px; border-radius: 20px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+    background: var(--parchment) center/cover no-repeat; box-shadow: 0 18px 34px -16px rgba(0,0,0,0.5), 0 2px 0 rgba(255,255,255,0.4) inset;
+    cursor: pointer;
+  }
+  .ov-hero-tile.has-img { background-color: var(--ink); }
+  .ov-hero-tile .tile-gradient { position: absolute; inset: 0; background: rgba(10, 21, 36, 0.55); pointer-events: none; }
+  .ov-hero-tile .icon, .ov-hero-tile .title, .ov-hero-tile .subtitle, .ov-hero-tile .badge { position: relative; z-index: 1; }
+  .ov-hero-tile.has-img .title, .ov-hero-tile.has-img .subtitle { color: var(--parchment); }
+  .ov-hero-tile .icon { width: 46px; height: 46px; margin-bottom: 14px; }
+  .ov-hero-tile .title { font-family: 'Fraunces', serif; font-weight: 520; font-size: 22px; color: var(--charcoal); margin: 0 0 8px 0; }
+  .ov-hero-tile .subtitle { font-size: 13px; color: var(--charcoal-soft); max-width: 220px; line-height: 1.4; margin: 0; }
+  .ov-hero-tile .badge {
+    position: absolute; top: 16px; right: 16px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--brass); background: rgba(184,146,90,0.14); padding: 4px 9px; border-radius: 20px;
+  }
+  .ov-category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ov-category-tile {
+    aspect-ratio: 315 / 367; border-radius: 18px; background: var(--parchment) center/cover no-repeat;
+    box-shadow: 0 14px 26px -14px rgba(0,0,0,0.45), 0 2px 0 rgba(255,255,255,0.4) inset;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 10px;
+    padding-bottom: 16px; cursor: pointer; position: relative; overflow: hidden;
+  }
+  .ov-category-tile.has-img { background-color: var(--ink); }
+  .ov-category-tile .tile-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(10,21,36,0.15) 0%, rgba(10,21,36,0.72) 100%);
+    pointer-events: none;
+  }
+  .ov-category-tile .icon-badge, .ov-category-tile .cat-name { position: relative; z-index: 1; }
+  .ov-category-tile.has-img .icon-badge { background: rgba(243, 234, 216, 0.75); border: 1px solid rgba(184, 146, 90, 0.5); }
+  .ov-category-tile.has-img .cat-name { color: var(--parchment); }
+  .ov-category-tile .icon-badge {
+    width: 44px; height: 44px; border-radius: 50%; background: rgba(184,146,90,0.1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ov-category-tile .icon-badge svg { width: 24px; height: 24px; }
+  .ov-category-tile .cat-name { font-size: 12.5px; font-weight: 600; color: var(--charcoal); text-align: center; letter-spacing: 0.01em; }
+  .ov-section-label {
+    color: rgba(230, 220, 200, 0.4); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+    font-weight: 600; margin: 4px 4px 10px 4px;
+  }
+  .ov-toast {
+    position: absolute; left: 20px; right: 20px; bottom: 24px; z-index: 50;
+    text-align: center; opacity: 0; transition: opacity 0.25s ease; pointer-events: none;
+  }
+  .ov-toast span {
+    display: inline-block; font-size: 12px; color: #F3EAD8;
+    background: rgba(10, 21, 36, 0.85); padding: 8px 16px; border-radius: 20px;
+  }
+
+  .overview-back-btn {
+    position: absolute; top: 44px; left: 18px; z-index: 35; display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; background: rgba(10, 21, 36, 0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+border-radius: 50%; color: #F3EAD8; box-shadow: 0 4px 12px -4px rgba(0,0,0,0.6);
+cursor: pointer; border: none;
+  }
+  .overview-back-btn svg { width: 17px; height: 17px; }
+
+  .statusbar {
+    height: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 26px; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: rgba(240, 233, 216, 0.82);
+  }
+  .statusbar.on-media { position: absolute; top: 0; left: 0; right: 0; z-index: 15; color: rgba(255,255,255,0.92); }
+  .statusbar.on-light { color: rgba(36,31,24,0.55); }
+
+  /* ---------- card feed (stacked deck, volle Größe) ---------- */
+  .card-area { flex: 1; padding: 0; position: relative; overflow: hidden; touch-action: pan-y; }
+  .card-stack { position: relative; width: 100%; height: 100%; }
+
+  .card-slide {
+    position: absolute; inset: 0;
+    will-change: transform;
+  }
+  .card-slide.animated {
+    transition: transform 0.3s cubic-bezier(.22,.85,.32,1);
+  }
+
+  .card {
+    position: relative; width: 100%; height: 100%; background: var(--parchment); border-radius: 26px;
+    display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 24px 40px -18px rgba(0,0,0,0.55), 0 2px 0 rgba(255,255,255,0.4) inset;
+  }
+
+  .media { position: relative; width: 100%; flex: 0 0 27%; overflow: hidden; }
+  .media svg, .hero svg { width: 100%; height: 100%; display: block; }
+  .media img.hero-img, .hero img.hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .lat-ticks { position: absolute; top: 10px; left: 0; right: 0; height: 14px; display: flex; justify-content: space-between; padding: 0 14px; opacity: 0.55; }
+  .lat-ticks span { width: 1px; height: 100%; background: rgba(243, 234, 216, 0.55); }
+  .lat-ticks span:nth-child(4n) { background: rgba(243,234,216,0.85); }
+  .media-gradient { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(18,33,58,0) 55%, rgba(18,33,58,0.35) 100%); }
+
+  .seal {
+    position: absolute; left: 18px; bottom: -20px; width: 52px; height: 52px; border-radius: 50%;
+    background: var(--parchment); border: 1.5px solid var(--brass); box-shadow: 0 8px 16px -6px rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center; z-index: 5;
+  }
+  .seal svg { width: 26px; height: 26px; }
+
+  .body { flex: 1; display: flex; flex-direction: column; padding: 20px 22px 16px 22px; }
+  .eyebrow { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
+  .eyebrow-cat { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); }
+  .eyebrow-source { font-size: 12px; font-weight: 500; color: var(--charcoal-soft); letter-spacing: 0.01em; }
+  .eyebrow-source .source-name { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--charcoal-soft); }
+  .eyebrow-source .colon { margin-right: 3px; }
+
+  .headline {
+    font-family: 'Fraunces', serif; font-optical-sizing: auto; font-weight: 460;
+    font-size: 16px; line-height: 1.38; color: var(--charcoal); letter-spacing: -0.002em; margin: 0;
+  }
+  .headline em, .lead em { font-style: italic; font-weight: 500; color: #3a2f22; }
+
+  /* tap zones (invisible) on the top card only */
+  .tap-zone { position: absolute; top: 0; bottom: 0; width: 22%; z-index: 6; }
+  .tap-zone.left { left: 0; }
+  .tap-zone.right { right: 0; }
+  .tap-zone.center { left: 22%; right: 22%; z-index: 6; }
+
+  .dots {
+    position: absolute; left: 0; right: 0; bottom: 16px; z-index: 10;
+    display: flex; justify-content: center; gap: 7px; pointer-events: none;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(36, 31, 24, 0.25); transition: background 0.2s ease, transform 0.2s ease; }
+  .dot.active { background: var(--brass-bright); transform: scale(1.25); }
+
+  /* ---------- summary view ---------- */
+  .hero { position: relative; width: 100%; flex: 0 0 34%; overflow: hidden; }
+  .hero-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(10,21,36,0.35) 0%, rgba(10,21,36,0.05) 30%, rgba(243,234,216,0) 60%, var(--parchment) 100%);
+  }
+  .back-btn {
+    position: absolute; top: 44px; left: 18px; z-index: 25; display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; background: rgba(10, 21, 36, 0.42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    border-radius: 50%; color: #F3EAD8; cursor: pointer; border: none;
+  }
+  .back-btn svg { width: 17px; height: 17px; }
+
+  .feedback-cluster { position: absolute; right: 6px; bottom: 6px; z-index: 25; display: flex; gap: 3px; }
+  .fb-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(10, 21, 36, 0.42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    border: none; color: #F3EAD8; cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+  }
+  .fb-btn svg { width: 10px; height: 10px; }
+  .fb-btn.active { background: var(--brass); color: var(--ink); }
+  .fb-btn.active svg path { fill: currentColor; }
+
+  .fb-scope-popup {
+    position: absolute; z-index: 30; display: none; gap: 4px;
+    background: rgba(10, 21, 36, 0.88); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    padding: 6px; border-radius: 12px;
+  }
+  .fb-scope-popup button {
+    border: none; background: rgba(255,255,255,0.08); color: #F3EAD8;
+    font-family: 'Libre Franklin', sans-serif; font-size: 11px; font-weight: 600;
+    padding: 6px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+  }
+  .fb-scope-popup button:hover { background: var(--brass); color: var(--ink); }
+
+  .fb-toast {
+    position: absolute; left: 10px; right: 10px; bottom: 52px; z-index: 24;
+    text-align: center; opacity: 0; transition: opacity 0.25s ease; pointer-events: none;
+  }
+  .fb-toast span {
+    display: inline-block; font-size: 11px; color: #F3EAD8;
+    background: rgba(10, 21, 36, 0.75); padding: 5px 12px; border-radius: 20px;
+  }
+
+  .fb-comment-panel {
+    display: none; margin: 0 0 18px 0; padding: 12px; border-radius: 14px;
+    background: rgba(184, 146, 90, 0.08); border: 1px solid var(--parchment-edge);
+  }
+  .fb-comment-panel textarea {
+    width: 100%; min-height: 60px; resize: vertical; border: none; background: transparent;
+    font-family: 'Libre Franklin', sans-serif; font-size: 13px; color: var(--charcoal); outline: none;
+  }
+  .fb-comment-panel .fb-send {
+    margin-top: 6px; border: none; background: var(--ink); color: var(--parchment);
+    font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 10px; cursor: pointer;
+  }
+
+  .reading { flex: 1; overflow-y: auto; padding: 18px 24px 0 24px; }
+  .lead {
+    font-family: 'Fraunces', serif; font-optical-sizing: auto; font-weight: 520;
+    font-size: 17px; line-height: 1.4; color: var(--charcoal); letter-spacing: -0.003em; margin: 0 0 14px 0;
+  }
+  .summary-body { font-size: 14.5px; line-height: 1.62; color: #3A3327; margin: 0 0 22px 0; }
+  .word-count { font-size: 11px; color: var(--charcoal-soft); opacity: 0.6; letter-spacing: 0.03em; margin-bottom: 24px; }
+
+  .actions { flex-shrink: 0; padding: 14px 24px 20px 24px; background: var(--parchment); border-top: 1px solid var(--parchment-edge); }
+  .cta {
+    width: 100%; background: var(--ink); color: var(--parchment); border: none; border-radius: 14px;
+    padding: 15px 18px; font-family: 'Libre Franklin', sans-serif; font-size: 14.5px; font-weight: 600;
+    letter-spacing: 0.01em; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+  }
+  .cta svg { width: 15px; height: 15px; }
+
+  /* ---------- fulltext view ---------- */
+  .ft-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 18px 12px 22px; color: var(--charcoal-soft); font-size: 13px; font-weight: 600; flex-shrink: 0; }
+  .ft-header-back, .ft-close {
+    display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(36,31,24,0.06); color: var(--charcoal-soft); cursor: pointer; flex-shrink: 0;
+  }
+  .ft-header-back svg { width: 15px; height: 15px; }
+  .ft-close svg { width: 14px; height: 14px; }
+  .ft-reading { flex: 1; overflow-y: auto; padding: 0 24px 28px 24px; }
+  .ft-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--brass); background: rgba(184,146,90,0.14); padding: 5px 11px; border-radius: 20px; margin-bottom: 16px;
+  }
+  .ft-title { font-family: 'Fraunces', serif; font-weight: 560; font-size: 20px; line-height: 1.3; color: var(--charcoal); margin: 0 0 10px 0; }
+  .ft-source-meta { font-size: 12px; font-weight: 500; color: var(--charcoal-soft); letter-spacing: 0.01em; margin: 0 0 18px 0; }
+  .ft-source-meta .source-name { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--charcoal-soft); }
+  .ft-source-meta .colon { margin-right: 3px; }
+  .ft-source-meta .dot { margin: 0 6px; opacity: 0.55; }
+  .ft-reading p { font-size: 14px; line-height: 1.68; color: #3A3327; margin: 0 0 14px 0; }
+
+  /* ---------- Ladezustand / Fehlerfall beim fetch()-Laden von articles.json (Schritt 3, Plan-Punkt 8.1) ---------- */
+  .load-state, .load-error {
+    position: absolute; inset: 0; z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; background: var(--ink); color: var(--parchment);
+    font-family: 'Libre Franklin', sans-serif; text-align: center; padding: 32px;
+  }
+  .load-spinner {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 2.5px solid rgba(243, 234, 216, 0.18); border-top-color: var(--brass-bright);
+    animation: load-spin 0.85s linear infinite;
+  }
+  @keyframes load-spin { to { transform: rotate(360deg); } }
+  .load-state p { margin: 0; font-size: 13.5px; color: var(--parchment-edge); }
+  .load-error-title { font-family: 'Fraunces', serif; font-weight: 560; font-size: 19px; color: var(--parchment); margin: 0; }
+  .load-error-text { font-size: 13.5px; color: var(--parchment-edge); margin: 0; max-width: 260px; line-height: 1.5; }
+  .load-retry-btn {
+    margin-top: 4px; padding: 10px 22px; border-radius: 999px; border: 1px solid var(--brass);
+    background: transparent; color: var(--brass-bright); font-family: 'Libre Franklin', sans-serif;
+    font-size: 13.5px; font-weight: 600; cursor: pointer;
+  }
+  .load-retry-btn:active { background: rgba(184, 146, 90, 0.15); }
+</style>
+</head>
+<body>
+
+<div class="screen">
+  <div class="views-wrap">
+
+          <!-- VIEW 0: Übersichtsseite (Startbildschirm) -->
+          <div class="view active" id="view-overview">
+            <div class="ov-content">
+              <div class="ov-hero-tile" id="ovHeroMeinTag">
+                <span class="badge">Platzhalter</span>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#B8925A" stroke-width="1.3">
+                  <circle cx="12" cy="12" r="4.2"/>
+                  <line x1="12" y1="2.5" x2="12" y2="5.2"/><line x1="12" y1="18.8" x2="12" y2="21.5"/>
+                  <line x1="2.5" y1="12" x2="5.2" y2="12"/><line x1="18.8" y1="12" x2="21.5" y2="12"/>
+                  <line x1="5.4" y1="5.4" x2="7.3" y2="7.3"/><line x1="16.7" y1="16.7" x2="18.6" y2="18.6"/>
+                  <line x1="18.6" y1="5.4" x2="16.7" y2="7.3"/><line x1="7.3" y1="16.7" x2="5.4" y2="18.6"/>
+                </svg>
+                <p class="title">Mein Tag</p>
+                <p class="subtitle">Dein persönliches Tages-Briefing — noch nicht implementiert</p>
+              </div>
+              <div class="ov-hero-tile" id="ovHeroNewsFeed">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#B8925A" stroke-width="1.3" stroke-linejoin="round">
+                  <rect x="4" y="4" width="12" height="12" rx="2"/>
+                  <rect x="8" y="8" width="12" height="12" rx="2" fill="#F3EAD8"/>
+                </svg>
+                <p class="title">News Feed</p>
+                <p class="subtitle">Alle Kategorien gemischt, ein gemeinsamer Strom</p>
+              </div>
+              <div class="ov-section-label">Kategorien</div>
+              <div class="ov-category-grid" id="categoryGrid"></div>
+            </div>
+            <div class="ov-toast" id="ovToast"><span id="ovToastText"></span></div>
+          </div>
+
+          <!-- VIEW 1: Kartenübersicht (Stapel) -->
+          <div class="view" id="view-card">
+            <button class="overview-back-btn" id="overviewBackBtn" title="Zurück zur Übersicht">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="card-area">
+              <div class="card-stack" id="cardStack"></div>
+              <div class="dots" id="dots"></div>
+            </div>
+          </div>
+
+          <!-- VIEW 2: Zusammenfassung -->
+          <div class="view" id="view-summary">
+            <div class="hero" id="summaryHero">
+              <div class="hero-gradient"></div>
+              <button class="back-btn" onclick="showView('card')" title="Zurück zur Übersicht">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+            <div class="reading" id="summaryReading"></div>
+            <div class="actions">
+              <button class="cta" onclick="showView('fulltext')">
+                Vollständigen Artikel lesen
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- VIEW 3: Simulierter Volltext -->
+          <div class="view" id="view-fulltext">
+            <div class="ft-header">
+              <div class="ft-header-back" onclick="showView('summary')" title="Zurück zur Zusammenfassung">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="ft-close" onclick="showView('card')" title="Direkt zurück zur Kartenübersicht">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </div>
+            <div class="ft-reading" id="ftReading"></div>
+          </div>
+
+        </div>
+
+        <div class="load-state" id="loadState">
+          <div class="load-spinner"></div>
+          <p>Lade aktuelle Artikel …</p>
+        </div>
+        <div class="load-error" id="loadError" style="display:none;">
+          <p class="load-error-title">Inhalte nicht erreichbar</p>
+          <p class="load-error-text">articles.json konnte nicht geladen werden. Bitte Internetverbindung prüfen.</p>
+          <button class="load-retry-btn" id="loadRetryBtn">Erneut versuchen</button>
+        </div>
+      </div>
+
+<script>
+/* ======================================================================
+   GITHUB-KONFIGURATION — bitte nach Erstellung des Tokens ausfüllen
+   ======================================================================
+   Benötigt: Personal Access Token (fine-grained) mit Schreibzugriff
+   AUSSCHLIESSLICH auf das Repo "curio-preview" (Contents: Read & Write) —
+   kein account-/organisationsweiter Token (siehe PRD_Schritt3_Automatisierung.md,
+   Rahmenbedingungen). Der Token steht bewusst sichtbar hier im Client-Code —
+   von Jochen als akzeptables Risiko bei rein privater, unbeworbener Nutzung
+   bestätigt (Entscheidung 21.08.2026). Bis zur Eintragung laufen App-Start
+   und Lesen von articles.json normal weiter; nur das Schreiben von Feedback
+   und Lesestatus wird übersprungen (Konsolen-Warnung statt Fehler).
+*/
+const GITHUB_TOKEN  = "HIER_EINFÜGEN"; // <- GitHub-Token hier eintragen, sobald erstellt
+const GITHUB_OWNER  = "HIER_EINFÜGEN"; // <- dein GitHub-Benutzername/-Organisation
+const GITHUB_REPO   = "curio-preview";
+const GITHUB_BRANCH = "main";
+const ARTICLES_PATH = "articles.json";
+const FEEDBACK_PATH = "feedback.json";
+
+/* ---------- Artikeldaten: Laufzeit-Laden aus articles.json (Schritt 3, Plan-Punkt 8.1 — löst die zuvor fest eingebetteten Platzhalterdaten ab) ---------- */
+let allArticles = [];
+let articles = [];
+let currentCategory = 'News Feed';
+
+async function loadArticles() {
+  document.getElementById('loadError').style.display = 'none';
+  document.getElementById('loadState').style.display = 'flex';
+  try {
+    // Cache-Busting-Parameter, damit Safari/iOS keine veraltete Kopie zeigt
+    const res = await fetch(ARTICLES_PATH + '?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('Unerwartetes Datenformat (kein Array)');
+    allArticles = data;
+    articles = (currentCategory === 'News Feed') ? allArticles.slice() : allArticles.filter(a => a.category === currentCategory);
+    document.getElementById('loadState').style.display = 'none';
+    buildOverviewGrid();
+    buildCards();
+  } catch (err) {
+    console.error('[articles.json] Ladefehler:', err);
+    document.getElementById('loadState').style.display = 'none';
+    document.getElementById('loadError').style.display = 'flex';
+  }
+}
+
+/* ---------- GitHub-API: gemeinsamer Lese/Schreib-Helper für feedback.json & articles.json (Schritt 3, Plan-Punkt 8.2) ---------- */
+function githubConfigured() {
+  return !!GITHUB_TOKEN && GITHUB_TOKEN !== 'HIER_EINFÜGEN' && !!GITHUB_OWNER && GITHUB_OWNER !== 'HIER_EINFÜGEN';
+}
+
+async function githubGetFile(path) {
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${path}?ref=${GITHUB_BRANCH}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' } });
+  if (res.status === 404) return { sha: null, data: null }; // Datei existiert noch nicht — wird beim ersten Schreiben angelegt
+  if (!res.ok) throw new Error('GitHub GET fehlgeschlagen: HTTP ' + res.status);
+  const json = await res.json();
+  const decoded = decodeURIComponent(escape(atob(json.content.replace(/\n/g, ''))));
+  return { sha: json.sha, data: JSON.parse(decoded) };
+}
+
+async function githubPutFile(path, data, sha, message) {
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${path}`;
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+  const body = { message, content, branch: GITHUB_BRANCH };
+  if (sha) body.sha = sha;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error('GitHub PUT fehlgeschlagen: HTTP ' + res.status + ' ' + (await res.text().catch(() => '')));
+  return res.json();
+}
+
+/* Read-Modify-Write mit einem Retry bei Konflikt (z. B. sha veraltet, HTTP 409) — für den Einzelnutzer-Betrieb
+   dieser App ausreichend robust, löst aber echte gleichzeitige Schreibzugriffe mehrerer Geräte nicht strukturell
+   auf (siehe Sichtungs-Notiz zu diesem Cowork-Auftrag). Ohne konfigurierten Token wird der Schreibversuch
+   übersprungen (Konsolen-Warnung), damit die App auch vor Token-Eintragung normal nutzbar bleibt. */
+async function githubUpdateFile(path, mutateFn, message) {
+  if (!githubConfigured()) {
+    console.warn('[GitHub] Kein Token/Owner konfiguriert — Schreibvorgang übersprungen:', path);
+    return false;
+  }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { sha, data } = await githubGetFile(path);
+      const updated = mutateFn(data);
+      await githubPutFile(path, updated, sha, message);
+      return true;
+    } catch (err) {
+      console.error(`[GitHub] Schreibversuch ${attempt + 1} fehlgeschlagen für ${path}:`, err);
+      if (attempt === 1) return false;
+    }
+  }
+  return false;
+}
+
+/* Setzt gelesenAm beim ersten Öffnen der Zusammenfassung (Grundlage für das rollierende Zeitfenster,
+   siehe PRD_Schritt3_Automatisierung.md — Zeitfenster selbst ist Plan-Punkt 3, hier nur die Erfassung). */
+function markArticleRead(article) {
+  if (!article || article.gelesenAm) return; // nur beim ersten Öffnen, nicht bei jedem erneuten Aufruf
+  const stamp = new Date().toISOString();
+  article.gelesenAm = stamp; // sofort lokal setzen — bleibt für diese Session konsistent, auch bei Schreibfehler
+  githubUpdateFile(ARTICLES_PATH, (data) => {
+    const arr = Array.isArray(data) ? data : [];
+    const match = arr.find(x => x.id === article.id);
+    if (match) match.gelesenAm = stamp;
+    return arr;
+  }, `Lesestatus: ${article.id} gelesen`).then((ok) => {
+    if (!ok) console.warn('[GitHub] gelesenAm konnte nicht persistiert werden für', article.id);
+  });
+}
+
+function openFeed(name) {
+  currentCategory = name;
+  articles = (name === 'News Feed') ? allArticles.slice() : allArticles.filter(a => a.category === name);
+  current = 0;
+  buildCards();
+  showView('card');
+}
+
+let current = 0;
+let slideEls = [];
+let dragging = false, dragged = false, startX = 0, dragDeltaX = 0;
+let dragNeighborIndex = null, dragRole = null; // role: 'under' (vorwärts) oder 'over' (rückwärts)
+let feedbackState = {}; // { [articleIndex]: { thumb: 'up'|'down'|null, scope: 'source'|'topic'|'both'|null, commentGiven: boolean } } — rein visuell, keine Persistenz
+
+const SWIPE_THRESHOLD = 60;
+const Z_UNDER = 2, Z_TOP = 3, Z_OVER = 4;
+
+function heroSVG(a) {
+  // Absicherung gegen fehlende Platzhalterfelder (behoben 22.08.2026): articles.json enthält
+  // diese Felder nicht mehr, da alle echten Artikel ein Bild haben — Fallback greift nur,
+  // falls die künftige Automatisierung mal einen Artikel ohne Bild liefert.
+  const hue = a.hue || ['#3E5C8A', '#152B4C'];
+  const markerX = a.markerX ?? 200;
+  const markerY = a.markerY ?? 150;
+  a = { ...a, hue, markerX, markerY };
+  const id = Math.random().toString(36).slice(2, 8);
+  return `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="sky${id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${a.hue[0]}"/><stop offset="100%" stop-color="${a.hue[1]}"/>
+      </linearGradient>
+      <radialGradient id="glow${id}" cx="72%" cy="32%" r="55%">
+        <stop offset="0%" stop-color="#B8925A" stop-opacity="0.35"/><stop offset="100%" stop-color="#B8925A" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="400" height="300" fill="url(#sky${id})"/>
+    <rect width="400" height="300" fill="url(#glow${id})"/>
+    <g fill="none" stroke="#F3EAD8" stroke-opacity="0.28" stroke-width="1">
+      <ellipse cx="200" cy="150" rx="230" ry="230"/><ellipse cx="200" cy="150" rx="150" ry="230"/><ellipse cx="200" cy="150" rx="70" ry="230"/>
+      <line x1="-30" y1="150" x2="430" y2="150"/><line x1="-30" y1="80" x2="430" y2="80"/><line x1="-30" y1="220" x2="430" y2="220"/>
+    </g>
+    <path d="M60 190 C 90 150, 130 165, 150 140 C 175 110, 220 120, 235 95 C 255 65, 300 75, 320 60 C 345 42, 380 55, 400 45 L 400 300 L 0 300 L 0 230 C 20 210, 40 210, 60 190 Z" fill="#0F1D34" fill-opacity="0.55"/>
+    <g transform="translate(${a.markerX},${a.markerY})">
+      <circle r="14" fill="#B8925A" fill-opacity="0.18"/><circle r="4.2" fill="#F3EAD8" stroke="#B8925A" stroke-width="1.4"/>
+    </g>
+  </svg>`;
+}
+
+function buildCards() {
+  const stack = document.getElementById('cardStack');
+  const dots = document.getElementById('dots');
+  stack.innerHTML = '';
+  dots.innerHTML = '';
+  slideEls = [];
+
+  articles.forEach((a, i) => {
+    const slide = document.createElement('div');
+    slide.className = 'card-slide';
+    slide.innerHTML = `
+      <div class="card">
+        <div class="media">
+          ${a.image ? `<img class="hero-img" src="${a.image}" alt="">` : heroSVG(a)}
+          ${a.image ? '' : `<div class="lat-ticks">${'<span></span>'.repeat(21)}</div>`}
+          <div class="media-gradient"></div>
+          <div class="seal">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              ${getCategoryIcon(a.category)}
+            </svg>
+          </div>
+          <div class="fb-toast" id="fbToast-c${i}"><span id="fbToastText-c${i}"></span></div>
+          <div class="feedback-cluster" id="feedbackCluster-c${i}">
+            <button class="fb-btn" id="fbUp-c${i}" title="Gefällt mir (kurz antippen) · Quelle/Thema wählen (gedrückt halten)">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+            </button>
+            <button class="fb-btn" id="fbDown-c${i}" title="Gefällt mir nicht (kurz antippen) · Quelle/Thema wählen (gedrückt halten)">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
+            </button>
+            <button class="fb-btn" id="fbComment-c${i}" title="Kommentar hinzufügen">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="body">
+          <div class="eyebrow">
+            <div class="eyebrow-cat">${a.category}</div>
+            <div class="eyebrow-source"><span class="source-name">${a.source}</span><span class="colon">:</span> ${a.sourceContext}</div>
+          </div>
+          <p class="headline">${a.headline}</p>
+        </div>
+        <div class="fb-scope-popup" id="fbScopePopup-c${i}">
+          <button data-scope="source">Quelle</button>
+          <button data-scope="topic">Thema</button>
+          <button data-scope="both">Beides</button>
+        </div>
+        <div class="tap-zone left"></div>
+        <div class="tap-zone center"></div>
+        <div class="tap-zone right"></div>
+      </div>`;
+    stack.appendChild(slide);
+    slideEls.push(slide);
+    attachCardFeedback(i);
+
+    const dot = document.createElement('span');
+    dot.className = 'dot' + (i === 0 ? ' active' : '');
+    dots.appendChild(dot);
+  });
+
+  applyIdleLayout();
+  attachTapZones();
+  attachSwipe();
+}
+
+function stackWidth() {
+  return document.getElementById('cardStack').clientWidth;
+}
+
+/* ---------- Ruhezustand: aktuelle Karte oben, nächste bereits (volle Größe) darunter ---------- */
+function applyIdleLayout() {
+  slideEls.forEach((el, i) => {
+    el.classList.remove('animated');
+    if (i === current) {
+      el.style.zIndex = Z_TOP;
+      el.style.display = 'block';
+      el.style.transform = 'translateX(0px)';
+      el.style.pointerEvents = 'auto';
+    } else if (i === current + 1) {
+      el.style.zIndex = Z_UNDER;
+      el.style.display = 'block';
+      el.style.transform = 'translateX(0px)';
+      el.style.pointerEvents = 'none';
+    } else {
+      el.style.display = 'none';
+      el.style.pointerEvents = 'none';
+    }
+  });
+  updateDots();
+}
+
+function updateDots() {
+  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === current));
+}
+
+/* ---------- tap zones (left/center/right auf der obersten Karte) ---------- */
+function attachTapZones() {
+  slideEls.forEach((slide) => {
+    slide.querySelectorAll('.tap-zone').forEach((zone) => {
+      zone.addEventListener('click', () => {
+        if (dragged) { dragged = false; return; }
+        if (zone.classList.contains('left')) commitSwipe(-1);
+        else if (zone.classList.contains('right')) commitSwipe(1);
+        else openArticle(current);
+      });
+    });
+  });
+}
+
+/* ---------- drag / swipe ---------- */
+let swipeAttached = false;
+function attachSwipe() {
+  if (swipeAttached) return;
+  swipeAttached = true;
+  const area = document.querySelector('.card-area');
+  area.addEventListener('pointerdown', onPointerDown);
+  area.addEventListener('pointermove', onPointerMove);
+  area.addEventListener('pointerup', onPointerUp);
+  area.addEventListener('pointerleave', onPointerUp);
+}
+
+function onPointerDown(e) {
+  dragging = true; dragged = false; startX = e.clientX; dragDeltaX = 0;
+  dragNeighborIndex = null; dragRole = null;
+  slideEls[current].classList.remove('animated');
+}
+
+function onPointerMove(e) {
+  if (!dragging) return;
+  dragDeltaX = e.clientX - startX;
+  if (Math.abs(dragDeltaX) > 6) dragged = true;
+  const w = stackWidth();
+
+  if (dragDeltaX < 0) {
+    /* Vorwärts: nächste Karte liegt bereits (volle Größe) darunter, wird beim Wegschieben sichtbar */
+    const neighborIndex = current + 1;
+    if (neighborIndex < articles.length) {
+      dragNeighborIndex = neighborIndex; dragRole = 'under';
+      slideEls[current].style.transform = `translateX(${dragDeltaX}px)`;
+    } else {
+      dragNeighborIndex = null; dragRole = null;
+      slideEls[current].style.transform = `translateX(${dragDeltaX * 0.25}px)`; // Gummizug, kein weiterer Nachbar
+    }
+  } else if (dragDeltaX > 0) {
+    /* Rückwärts: vorherige Karte kommt von links über den Stapel zurück */
+    const neighborIndex = current - 1;
+    if (neighborIndex >= 0) {
+      dragNeighborIndex = neighborIndex; dragRole = 'over';
+      const pv = slideEls[neighborIndex];
+      pv.classList.remove('animated');
+      pv.style.display = 'block';
+      pv.style.zIndex = Z_OVER;
+      pv.style.pointerEvents = 'none';
+      pv.style.transform = `translateX(${-w + dragDeltaX}px)`;
+      slideEls[current].style.transform = 'translateX(0px)'; // aktuelle Karte bleibt liegen, wird überdeckt
+    } else {
+      dragNeighborIndex = null; dragRole = null;
+      slideEls[current].style.transform = `translateX(${dragDeltaX * 0.25}px)`; // Gummizug, keine vorherige Karte
+    }
+  } else {
+    slideEls[current].style.transform = 'translateX(0px)';
+  }
+}
+
+function onPointerUp() {
+  if (!dragging) return;
+  dragging = false;
+  const topEl = slideEls[current];
+
+  if (Math.abs(dragDeltaX) > SWIPE_THRESHOLD && dragNeighborIndex !== null) {
+    if (dragRole === 'under') performForwardCommit(dragNeighborIndex);
+    else performBackwardCommit(dragNeighborIndex);
+  } else {
+    // zurückschnappen
+    topEl.classList.add('animated');
+    topEl.style.transform = 'translateX(0px)';
+    if (dragRole === 'over' && dragNeighborIndex !== null) {
+      const pv = slideEls[dragNeighborIndex];
+      const w = stackWidth();
+      pv.classList.add('animated');
+      pv.style.transform = `translateX(${-w}px)`;
+      const resetIdx = dragNeighborIndex;
+      setTimeout(() => {
+        slideEls[resetIdx].classList.remove('animated');
+        slideEls[resetIdx].style.display = 'none';
+      }, 300);
+    }
+    setTimeout(() => { topEl.classList.remove('animated'); }, 300);
+  }
+  dragDeltaX = 0;
+  dragNeighborIndex = null; dragRole = null;
+}
+
+/* ---------- programmatischer Swipe (Rand-Zonen antippen) ---------- */
+function commitSwipe(direction) {
+  const newIndex = current + direction;
+  if (newIndex < 0 || newIndex >= articles.length) return;
+
+  if (direction === 1) {
+    performForwardCommit(newIndex);
+  } else {
+    const w = stackWidth();
+    const pv = slideEls[newIndex];
+    pv.classList.remove('animated');
+    pv.style.display = 'block';
+    pv.style.zIndex = Z_OVER;
+    pv.style.pointerEvents = 'none';
+    pv.style.transform = `translateX(${-w}px)`;
+    pv.getBoundingClientRect(); // reflow, damit die folgende Änderung animiert
+    performBackwardCommit(newIndex);
+  }
+}
+
+function performForwardCommit(newIndex) {
+  const topEl = slideEls[current];
+  const w = stackWidth();
+  topEl.classList.add('animated');
+  requestAnimationFrame(() => {
+    topEl.style.transform = `translateX(${-w * 1.15}px)`;
+  });
+  setTimeout(() => finalizeIndex(newIndex), 300);
+}
+
+function performBackwardCommit(newIndex) {
+  const pv = slideEls[newIndex];
+  pv.classList.add('animated');
+  requestAnimationFrame(() => {
+    pv.style.transform = 'translateX(0px)';
+  });
+  setTimeout(() => finalizeIndex(newIndex), 300);
+}
+
+function finalizeIndex(newIndex) {
+  current = newIndex;
+  applyIdleLayout();
+}
+
+/* ---------- summary / fulltext ---------- */
+function openArticle(i) {
+  current = i;
+  showView('summary');
+}
+
+function renderSummary() {
+  const a = articles[current];
+  markArticleRead(a);
+  document.getElementById('summaryHero').innerHTML =
+    (a.image ? `<img class="hero-img" src="${a.image}" alt="">` : heroSVG(a)) +
+    `<div class="hero-gradient"></div>
+     <button class="back-btn" onclick="showView('card')" title="Zurück zur Übersicht">
+       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+     </button>
+     <div class="fb-toast" id="fbToast"><span id="fbToastText"></span></div>
+     <div class="feedback-cluster" id="feedbackCluster">
+       <button class="fb-btn" id="fbUp" title="Gefällt mir (kurz antippen) · Quelle/Thema wählen (gedrückt halten)">
+         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+       </button>
+       <button class="fb-btn" id="fbDown" title="Gefällt mir nicht (kurz antippen) · Quelle/Thema wählen (gedrückt halten)">
+         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
+       </button>
+       <button class="fb-btn" id="fbComment" title="Kommentar hinzufügen">
+         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+       </button>
+     </div>
+     <div class="fb-scope-popup" id="fbScopePopup">
+       <button data-scope="source">Quelle</button>
+       <button data-scope="topic">Thema</button>
+       <button data-scope="both">Beides</button>
+     </div>`;
+  document.getElementById('summaryReading').innerHTML = `
+    <div class="eyebrow">
+      <div class="eyebrow-cat">${a.category}</div>
+      <div class="eyebrow-source"><span class="source-name">${a.source}</span><span class="colon">:</span> ${a.sourceContext}</div>
+    </div>
+    <p class="lead">${a.lead}</p>
+    <p class="summary-body">${a.summaryBody}</p>
+    <div class="fb-comment-panel" id="fbCommentPanel">
+      <textarea id="fbCommentInput" placeholder="Was möchtest du uns mitteilen?"></textarea>
+      <button class="fb-send" id="fbCommentSend">Senden</button>
+    </div>
+    <div class="word-count">${a.wordCount}</div>`;
+  initFeedback(current);
+}
+
+/* ---------- Feedback: Daumen hoch/runter (Tap = Quelle+Thema, Long-Press = Auswahl), Kommentar ---------- */
+/* Schritt 3, Plan-Punkt 8.2: echtes Schreiben in feedback.json über die GitHub-API (löst die simulierte
+   Debug-Panel-Erfassung aus Plan-Punkt 7 ab). Schema unverändert gemäß PRD_Schritt3_Kuration.md, Plan-Punkt 7. */
+
+function bezugLabel(scope) { return scope === 'source' ? 'quelle' : scope === 'topic' ? 'thema' : 'beides'; }
+function richtungLabel(thumb) { return thumb === 'up' ? 'hoch' : 'runter'; }
+
+/* toastCtx (optional): { toastId, textId } der Toast-Elemente am Aufrufort — wird bei einem Schreibfehler
+   genutzt, um dort nachträglich einen Warnhinweis zu zeigen (der ursprüngliche Erfolgs-Toast wird überschrieben). */
+function logFeedback(entry, toastCtx) {
+  console.log('[Feedback]', JSON.stringify(entry, null, 2));
+  githubUpdateFile(FEEDBACK_PATH, (data) => {
+    const arr = Array.isArray(data) ? data : [];
+    arr.push(entry);
+    return arr;
+  }, `Feedback: ${entry.type} · ${entry.articleId}`).then((ok) => {
+    if (!ok && toastCtx) showFbToast(toastCtx.toastId, toastCtx.textId, 'Feedback lokal erfasst, Speichern fehlgeschlagen — siehe Konsole');
+  });
+}
+
+/* Hält Karten-Icons und Zusammenfassungs-Icons synchron, unabhängig davon, wo das Feedback gegeben wurde.
+   Schlüssel ist die Artikel-ID (nicht die Kartenposition) — sonst würde beim Kategoriewechsel der Feedback-Status
+   der vorherigen Kategorie an derselben Positions-Nummer "durchscheinen" (Bug, behoben 20.08.2026). */
+function refreshFeedbackIcon(index) {
+  const art = articles[index];
+  const state = (art && feedbackState[art.id]) || {};
+  const cUp = document.getElementById('fbUp-c' + index);
+  const cDown = document.getElementById('fbDown-c' + index);
+  const cComment = document.getElementById('fbComment-c' + index);
+  if (cUp) cUp.classList.toggle('active', state.thumb === 'up');
+  if (cDown) cDown.classList.toggle('active', state.thumb === 'down');
+  if (cComment) cComment.classList.toggle('active', !!state.commentGiven);
+
+  if (current === index) {
+    const sUp = document.getElementById('fbUp');
+    const sDown = document.getElementById('fbDown');
+    const sComment = document.getElementById('fbComment');
+    if (sUp) sUp.classList.toggle('active', state.thumb === 'up');
+    if (sDown) sDown.classList.toggle('active', state.thumb === 'down');
+    if (sComment) sComment.classList.toggle('active', !!state.commentGiven);
+  }
+}
+
+function showFbToast(toastId, textId, msg) {
+  const toast = document.getElementById(toastId);
+  const text = document.getElementById(textId);
+  if (!toast || !text) return;
+  text.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 1800);
+}
+
+/* Zusammenfassungsansicht (immer dieselben IDs, wird bei jedem Öffnen neu aufgebaut) */
+function initFeedback(index) {
+  const art = articles[index];
+  const state = feedbackState[art.id] || (feedbackState[art.id] = { thumb: null, scope: null, commentGiven: false });
+  const up = document.getElementById('fbUp');
+  const down = document.getElementById('fbDown');
+  const commentBtn = document.getElementById('fbComment');
+  const popup = document.getElementById('fbScopePopup');
+  const panel = document.getElementById('fbCommentPanel');
+  const input = document.getElementById('fbCommentInput');
+  const sendBtn = document.getElementById('fbCommentSend');
+
+  refreshFeedbackIcon(index);
+
+  let pressTimer = null, longPressed = false;
+
+  function startPress(thumbType) {
+    longPressed = false;
+    pressTimer = setTimeout(() => { longPressed = true; openScopePopup(thumbType); }, 450);
+  }
+  function endPress(thumbType) {
+    clearTimeout(pressTimer);
+    if (longPressed) return;
+    if (state.thumb === thumbType) { state.thumb = null; state.scope = null; }
+    else {
+      state.thumb = thumbType; state.scope = 'both';
+      showFbToast('fbToast', 'fbToastText', 'Feedback gespeichert · Quelle & Thema');
+      logFeedback({ timestamp: new Date().toISOString(), type: 'thumb', articleId: art.id, category: art.category, source: art.source, bezug: 'beides', richtung: richtungLabel(thumbType) }, { toastId: 'fbToast', textId: 'fbToastText' });
+    }
+    refreshFeedbackIcon(index);
+  }
+  function openScopePopup(thumbType) {
+    const btn = thumbType === 'up' ? up : down;
+    const heroRect = document.getElementById('summaryHero').getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    popup.style.display = 'flex';
+    popup.dataset.pendingThumb = thumbType;
+    popup.style.right = (heroRect.right - btnRect.right) + 'px';
+    popup.style.bottom = (heroRect.bottom - btnRect.top + 8) + 'px';
+  }
+
+  up.addEventListener('pointerdown', () => startPress('up'));
+  up.addEventListener('pointerup', () => endPress('up'));
+  up.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+  down.addEventListener('pointerdown', () => startPress('down'));
+  down.addEventListener('pointerup', () => endPress('down'));
+  down.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
+  popup.querySelectorAll('button').forEach((pbtn) => {
+    pbtn.addEventListener('click', () => {
+      const scope = pbtn.dataset.scope;
+      const thumbType = popup.dataset.pendingThumb;
+      state.thumb = thumbType; state.scope = scope;
+      refreshFeedbackIcon(index);
+      popup.style.display = 'none';
+      const label = scope === 'source' ? 'Quelle' : scope === 'topic' ? 'Thema' : 'Quelle & Thema';
+      showFbToast('fbToast', 'fbToastText', 'Feedback zu ' + label + ' gespeichert');
+      logFeedback({ timestamp: new Date().toISOString(), type: 'thumb', articleId: art.id, category: art.category, source: art.source, bezug: bezugLabel(scope), richtung: richtungLabel(thumbType) }, { toastId: 'fbToast', textId: 'fbToastText' });
+    });
+  });
+
+  commentBtn.addEventListener('click', () => {
+    const isOpen = panel.style.display === 'block';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) input.focus();
+  });
+
+  sendBtn.addEventListener('click', () => {
+    if (input.value.trim()) {
+      state.commentGiven = true;
+      refreshFeedbackIcon(index);
+      showFbToast('fbToast', 'fbToastText', 'Danke — Kommentar gespeichert');
+      logFeedback({ timestamp: new Date().toISOString(), type: 'freitext', articleId: art.id, category: art.category, source: art.source, kommentar: input.value.trim() }, { toastId: 'fbToast', textId: 'fbToastText' });
+      input.value = '';
+      panel.style.display = 'none';
+    }
+  });
+}
+
+/* Kartenübersicht (je Karte fest verankerte IDs, einmalig beim Aufbau des Feeds gebunden) */
+function attachCardFeedback(index) {
+  const art = articles[index];
+  if (!feedbackState[art.id]) feedbackState[art.id] = { thumb: null, scope: null, commentGiven: false };
+  const state = feedbackState[art.id];
+  const up = document.getElementById('fbUp-c' + index);
+  const down = document.getElementById('fbDown-c' + index);
+  const commentBtn = document.getElementById('fbComment-c' + index);
+  const popup = document.getElementById('fbScopePopup-c' + index);
+  const cluster = document.getElementById('feedbackCluster-c' + index);
+
+  // Verhindert, dass ein Tap auf die Icons gleichzeitig Swipe/Tap-Zonen der Karte auslöst
+  cluster.addEventListener('pointerdown', (e) => e.stopPropagation());
+  cluster.addEventListener('click', (e) => e.stopPropagation());
+  popup.addEventListener('pointerdown', (e) => e.stopPropagation());
+  popup.addEventListener('click', (e) => e.stopPropagation());
+
+  let pressTimer = null, longPressed = false;
+
+  function startPress(thumbType) {
+    longPressed = false;
+    pressTimer = setTimeout(() => { longPressed = true; openScopePopup(thumbType); }, 450);
+  }
+  function endPress(thumbType) {
+    clearTimeout(pressTimer);
+    if (longPressed) return;
+    if (state.thumb === thumbType) { state.thumb = null; state.scope = null; }
+    else {
+      state.thumb = thumbType; state.scope = 'both';
+      showFbToast('fbToast-c' + index, 'fbToastText-c' + index, 'Feedback gespeichert · Quelle & Thema');
+      logFeedback({ timestamp: new Date().toISOString(), type: 'thumb', articleId: art.id, category: art.category, source: art.source, bezug: 'beides', richtung: richtungLabel(thumbType) }, { toastId: 'fbToast-c' + index, textId: 'fbToastText-c' + index });
+    }
+    refreshFeedbackIcon(index);
+  }
+  function openScopePopup(thumbType) {
+    const btn = thumbType === 'up' ? up : down;
+    const cardRect = document.getElementById('feedbackCluster-c' + index).closest('.card').getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    popup.style.display = 'flex';
+    popup.dataset.pendingThumb = thumbType;
+    popup.style.right = (cardRect.right - btnRect.right) + 'px';
+    popup.style.bottom = (cardRect.bottom - btnRect.top + 8) + 'px';
+  }
+
+  up.addEventListener('pointerdown', () => startPress('up'));
+  up.addEventListener('pointerup', () => endPress('up'));
+  up.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+  down.addEventListener('pointerdown', () => startPress('down'));
+  down.addEventListener('pointerup', () => endPress('down'));
+  down.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
+  popup.querySelectorAll('button').forEach((pbtn) => {
+    pbtn.addEventListener('click', () => {
+      const scope = pbtn.dataset.scope;
+      const thumbType = popup.dataset.pendingThumb;
+      state.thumb = thumbType; state.scope = scope;
+      refreshFeedbackIcon(index);
+      popup.style.display = 'none';
+      const label = scope === 'source' ? 'Quelle' : scope === 'topic' ? 'Thema' : 'Quelle & Thema';
+      showFbToast('fbToast-c' + index, 'fbToastText-c' + index, 'Feedback zu ' + label + ' gespeichert');
+      logFeedback({ timestamp: new Date().toISOString(), type: 'thumb', articleId: art.id, category: art.category, source: art.source, bezug: bezugLabel(scope), richtung: richtungLabel(thumbType) }, { toastId: 'fbToast-c' + index, textId: 'fbToastText-c' + index });
+    });
+  });
+
+  // Kommentar aus der Kartenübersicht: springt in die Zusammenfassung und öffnet dort direkt das Textfeld
+  commentBtn.addEventListener('click', () => openArticleWithComment(index));
+
+  refreshFeedbackIcon(index);
+}
+
+function openArticleWithComment(index) {
+  current = index;
+  showView('summary');
+  setTimeout(() => {
+    const panel = document.getElementById('fbCommentPanel');
+    const input = document.getElementById('fbCommentInput');
+    if (panel) { panel.style.display = 'block'; }
+    if (input) { input.focus(); }
+  }, 50);
+}
+
+function renderFulltext() {
+  const a = articles[current];
+  document.getElementById('ftReading').innerHTML = `
+    <span class="ft-badge">Simulierter Volltext · Platzhalter, bereinigt um Werbung</span>
+    <h1 class="ft-title">${a.ftTitle}</h1>
+    <div class="ft-source-meta"><span class="source-name">${a.source}</span><span class="colon">:</span> ${a.sourceContext}<span class="dot">·</span>${a.ftMeta}</div>
+    ${a.ftParagraphs.map(p => `<p>${p}</p>`).join('')}`;
+}
+
+function showView(name) {
+  if (name === 'card') applyIdleLayout();
+  if (name === 'summary') renderSummary();
+  if (name === 'fulltext') renderFulltext();
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+}
+
+/* ---------- Übersichtsseite ---------- */
+const overviewCategories = [
+  { name: 'Welt', icon: `<circle cx="12" cy="12" r="8.6" fill="none" stroke="#B8925A" stroke-width="1.1"/><ellipse cx="12" cy="12" rx="3.8" ry="8.6" fill="none" stroke="#B8925A" stroke-width="1.1"/><line x1="3.4" y1="12" x2="20.6" y2="12" stroke="#B8925A" stroke-width="1.1"/>` },
+  { name: 'Europa', icon: `<circle cx="12" cy="4" r="1.4" fill="#B8925A"/><circle cx="18.1" cy="6.5" r="1.4" fill="#B8925A"/><circle cx="20.6" cy="12.6" r="1.4" fill="#B8925A"/><circle cx="18.1" cy="18.7" r="1.4" fill="#B8925A"/><circle cx="12" cy="21.2" r="1.4" fill="#B8925A"/><circle cx="5.9" cy="18.7" r="1.4" fill="#B8925A"/><circle cx="3.4" cy="12.6" r="1.4" fill="#B8925A"/><circle cx="5.9" cy="6.5" r="1.4" fill="#B8925A"/>` },
+  { name: 'Deutschland', icon: `<path transform="scale(0.4)" d="M21.7,3.4 L19.9,10.1 L16.9,8.3 L13.9,11.5 L15.6,17.5 L11.2,24.1 L10.8,37.2 L15.5,41.9 L18.5,40.4 L15.6,48.3 L18.9,49.9 L12.4,54.6 L22.8,54.9 L24.8,58.0 L26.0,56.1 L32.2,58.0 L33.8,55.1 L42.8,56.1 L46.0,52.1 L38.5,52.0 L42.9,39.5 L38.0,37.0 L38.0,34.1 L49.2,28.0 L47.5,27.0 L49.1,24.1 L46.2,22.4 L47.6,19.4 L44.4,17.4 L47.7,13.1 L39.0,6.6 L30.3,6.5 L27.2,2.0 Z" stroke="#B8925A" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" fill="none"/>` },
+  { name: 'Wirtschaft', icon: `<rect x="4" y="13" width="3.4" height="7" fill="#B8925A"/><rect x="10.3" y="9" width="3.4" height="11" fill="#B8925A"/><rect x="16.6" y="4.5" width="3.4" height="15.5" fill="#B8925A"/>` },
+  { name: 'Finanzen', icon: `<polyline points="3,16 9,10 13,14 21,5" fill="none" stroke="#B8925A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><polyline points="15,5 21,5 21,11" fill="none" stroke="#B8925A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>` },
+  { name: 'Tech News – KI', icon: `<path d="M12 3 C12.6 8 13.8 10.2 20 12 C13.8 13.8 12.6 16 12 21 C11.4 16 10.2 13.8 4 12 C10.2 10.2 11.4 8 12 3 Z" fill="#B8925A"/><path d="M18 4 C18.3 5.5 18.8 6.2 20.5 6.5 C18.8 6.8 18.3 7.5 18 9 C17.7 7.5 17.2 6.8 15.5 6.5 C17.2 6.2 17.7 5.5 18 4 Z" fill="#B8925A"/>` },
+  { name: 'Tech News – Gadgets', icon: `<rect x="7" y="2.5" width="10" height="19" rx="2" fill="none" stroke="#B8925A" stroke-width="1.3"/><line x1="10" y1="19" x2="14" y2="19" stroke="#B8925A" stroke-width="1.3"/>` },
+  { name: 'Sport', icon: `<path d="M7 4 H17 V8 A5 5 0 0 1 7 8 Z" fill="none" stroke="#B8925A" stroke-width="1.3" stroke-linejoin="round"/><line x1="12" y1="13" x2="12" y2="17" stroke="#B8925A" stroke-width="1.3"/><line x1="8.5" y1="20" x2="15.5" y2="20" stroke="#B8925A" stroke-width="1.3"/><line x1="9.5" y1="17" x2="14.5" y2="17" stroke="#B8925A" stroke-width="1.3"/><path d="M7 5.5 H3.5 A2 3 0 0 0 7 9.5" fill="none" stroke="#B8925A" stroke-width="1.3"/><path d="M17 5.5 H20.5 A2 3 0 0 1 17 9.5" fill="none" stroke="#B8925A" stroke-width="1.3"/>` },
+  { name: 'Rezepte', icon: `<line x1="7" y1="3" x2="7" y2="10" stroke="#B8925A" stroke-width="1.3" stroke-linecap="round"/><line x1="5" y1="3" x2="5" y2="8" stroke="#B8925A" stroke-width="1.3" stroke-linecap="round"/><line x1="9" y1="3" x2="9" y2="8" stroke="#B8925A" stroke-width="1.3" stroke-linecap="round"/><line x1="7" y1="10" x2="7" y2="21" stroke="#B8925A" stroke-width="1.3" stroke-linecap="round"/><path d="M17 3 C14 3 14 9 17 10 V21" fill="none" stroke="#B8925A" stroke-width="1.3" stroke-linecap="round"/>` },
+  { name: 'Gesundheit & Fitness', icon: `<path d="M12 19 C6 14.5 3 11.5 3 8 A4 4 0 0 1 12 6 A4 4 0 0 1 21 8 C21 11.5 18 14.5 12 19 Z" fill="none" stroke="#B8925A" stroke-width="1.4" stroke-linejoin="round"/>` },
+  { name: 'Social Media', icon: `<path d="M4 5 H20 V15 H10 L6 19 V15 H4 Z" fill="none" stroke="#B8925A" stroke-width="1.3" stroke-linejoin="round"/>` },
+  { name: 'Sonstiges', icon: `<line x1="12" y1="3" x2="12" y2="21" stroke="#B8925A" stroke-width="1.4" stroke-linecap="round"/><line x1="3" y1="12" x2="21" y2="12" stroke="#B8925A" stroke-width="1.4" stroke-linecap="round"/><line x1="5.8" y1="5.8" x2="18.2" y2="18.2" stroke="#B8925A" stroke-width="1.4" stroke-linecap="round"/><line x1="5.8" y1="18.2" x2="18.2" y2="5.8" stroke="#B8925A" stroke-width="1.4" stroke-linecap="round"/>` }
+];
+
+function getCategoryIcon(catName) {
+  const found = overviewCategories.find(c => c.name === catName);
+  return found ? found.icon : overviewCategories[0].icon; // Fallback: Welt-Globus
+}
+
+
+function showOvToast(msg) {
+  const toast = document.getElementById('ovToast');
+  const text = document.getElementById('ovToastText');
+  text.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 1800);
+}
+
+function firstImageForCategory(catName) {
+  const match = allArticles.find(a => a.category === catName && a.image);
+  return match ? match.image : null;
+}
+
+function buildOverviewGrid() {
+  const grid = document.getElementById('categoryGrid');
+  grid.innerHTML = '';
+  overviewCategories.forEach((c) => {
+    const tile = document.createElement('div');
+    tile.className = 'ov-category-tile';
+    const img = firstImageForCategory(c.name);
+    let gradientDiv = '';
+    if (img) {
+      tile.classList.add('has-img');
+      tile.style.backgroundImage = `url(${img})`;
+      gradientDiv = '<div class="tile-gradient"></div>';
+    }
+    tile.innerHTML = `
+      ${gradientDiv}
+      <div class="icon-badge"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${c.icon}</svg></div>
+      <div class="cat-name">${c.name}</div>`;
+    tile.addEventListener('click', () => openFeed(c.name));
+    grid.appendChild(tile);
+  });
+  // News Feed-Hero: Bild des ersten Artikels im gemischten Strom (Welt, Artikel 1)
+  const newsFeedHero = document.getElementById('ovHeroNewsFeed');
+  if (allArticles[0] && allArticles[0].image) {
+    newsFeedHero.classList.add('has-img');
+    newsFeedHero.style.backgroundImage = `url(${allArticles[0].image})`;
+    newsFeedHero.insertAdjacentHTML('afterbegin', '<div class="tile-gradient"></div>');
+  }
+}
+
+document.getElementById('ovHeroMeinTag').addEventListener('click', () => showOvToast('Noch keine Inhalte'));
+document.getElementById('ovHeroNewsFeed').addEventListener('click', () => openFeed('News Feed'));
+document.getElementById('overviewBackBtn').addEventListener('click', () => showView('overview'));
+
+document.getElementById('loadRetryBtn').addEventListener('click', loadArticles);
+
+loadArticles();
+document.addEventListener('click', (e) => {
+  const popup = document.getElementById('fbScopePopup');
+  if (!popup || popup.style.display !== 'flex') return;
+  const up = document.getElementById('fbUp');
+  const down = document.getElementById('fbDown');
+  if (!popup.contains(e.target) && e.target !== up && e.target !== down && !up.contains(e.target) && !down.contains(e.target)) {
+    popup.style.display = 'none';
+  }
+});
+</script>
+</body>
+</html>
