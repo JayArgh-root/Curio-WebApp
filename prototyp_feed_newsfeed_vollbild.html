@@ -240,15 +240,27 @@
     font-size: 17px; line-height: 1.4; color: var(--charcoal); letter-spacing: -0.003em; margin: 0 0 14px 0;
   }
   .summary-body { font-size: 14.5px; line-height: 1.62; color: #3A3327; margin: 0 0 22px 0; }
-  .word-count { font-size: 11px; color: var(--charcoal-soft); opacity: 0.6; letter-spacing: 0.03em; margin-bottom: 24px; }
 
-  .actions { flex-shrink: 0; padding: 14px 24px 20px 24px; background: var(--parchment); border-top: 1px solid var(--parchment-edge); }
-  .cta {
-    width: 100%; background: var(--ink); color: var(--parchment); border: none; border-radius: 14px;
-    padding: 15px 18px; font-family: 'Libre Franklin', sans-serif; font-size: 14.5px; font-weight: 600;
-    letter-spacing: 0.01em; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+  .actions {
+    flex-shrink: 0; padding: 14px 24px 20px 24px; background: var(--parchment); border-top: 1px solid var(--parchment-edge);
+    display: flex; gap: 10px; position: relative;
   }
-  .cta svg { width: 15px; height: 15px; }
+  .cta {
+    flex: 1; width: auto; background: var(--ink); color: var(--parchment); border: none; border-radius: 14px;
+    padding: 15px 16px; font-family: 'Libre Franklin', sans-serif; font-size: 14px; font-weight: 600;
+    letter-spacing: 0.01em; display: flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer;
+  }
+  .cta svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .cta.disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .md-toast {
+    position: absolute; left: 20px; right: 20px; bottom: 100%; margin-bottom: 8px; z-index: 5;
+    text-align: center; opacity: 0; transition: opacity 0.25s ease; pointer-events: none;
+  }
+  .md-toast span {
+    display: inline-block; font-size: 12px; color: #F3EAD8;
+    background: rgba(10, 21, 36, 0.85); padding: 7px 14px; border-radius: 20px;
+  }
 
   /* ---------- fulltext view ---------- */
   .ft-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 18px 12px 22px; color: var(--charcoal-soft); font-size: 13px; font-weight: 600; flex-shrink: 0; }
@@ -349,14 +361,19 @@
             </div>
             <div class="reading" id="summaryReading"></div>
             <div class="actions">
-              <button class="cta" onclick="showView('fulltext')">
-                Vollständigen Artikel lesen
+              <div class="md-toast" id="mdToast"><span id="mdToastText"></span></div>
+              <button class="cta" id="btnMehrDetails" onclick="onMehrDetailsClick()">
+                Mehr Details
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <button class="cta" id="btnOriginal" onclick="onOriginalClick()">
+                Original öffnen
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
             </div>
           </div>
 
-          <!-- VIEW 3: Simulierter Volltext -->
+          <!-- VIEW 3: Mehr Details -->
           <div class="view" id="view-fulltext">
             <div class="ft-header">
               <div class="ft-header-back" onclick="showView('summary')" title="Zurück zur Zusammenfassung">
@@ -367,6 +384,12 @@
               </div>
             </div>
             <div class="ft-reading" id="ftReading"></div>
+            <div class="actions">
+              <button class="cta" id="btnOriginalFt" onclick="onOriginalClick()">
+                Original öffnen
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
           </div>
 
         </div>
@@ -395,9 +418,9 @@
    und Lesen von articles.json normal weiter; nur das Schreiben von Feedback
    und Lesestatus wird übersprungen (Konsolen-Warnung statt Fehler).
 */
-const GITHUB_TOKEN  = "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"; // <- GitHub-Token hier eintragen, sobald erstellt
-const GITHUB_OWNER  = "JayArgh-root"; // <- dein GitHub-Benutzername/-Organisation
-const GITHUB_REPO   = "Curio-WebApp";
+const GITHUB_TOKEN  = "HIER_EINFÜGEN"; // <- GitHub-Token hier eintragen, sobald erstellt
+const GITHUB_OWNER  = "HIER_EINFÜGEN"; // <- dein GitHub-Benutzername/-Organisation
+const GITHUB_REPO   = "curio-preview";
 const GITHUB_BRANCH = "main";
 const ARTICLES_PATH = "articles.json";
 const FEEDBACK_PATH = "feedback.json";
@@ -817,14 +840,53 @@ function renderSummary() {
       <div class="eyebrow-cat">${a.category}</div>
       <div class="eyebrow-source"><span class="source-name">${a.source}</span><span class="colon">:</span> ${a.sourceContext}</div>
     </div>
-    <p class="lead">${a.lead}</p>
+    <p class="lead">${a.headline}</p>
     <p class="summary-body">${a.summaryBody}</p>
     <div class="fb-comment-panel" id="fbCommentPanel">
       <textarea id="fbCommentInput" placeholder="Was möchtest du uns mitteilen?"></textarea>
       <button class="fb-send" id="fbCommentSend">Senden</button>
-    </div>
-    <div class="word-count">${a.wordCount}</div>`;
+    </div>`;
+  updateActionButtons(a);
   initFeedback(current);
+}
+
+/* ---------- Dreistufiges Lesekonzept: Mehr Details / Original öffnen (Schritt 3, Schema-Umstellung 26.08.2026) ---------- */
+function updateActionButtons(a) {
+  const btnMehr = document.getElementById('btnMehrDetails');
+  if (btnMehr) btnMehr.classList.toggle('disabled', a.mehrDetailsVerfuegbar === false);
+}
+
+function onMehrDetailsClick() {
+  const a = articles[current];
+  if (!a) return;
+  if (a.mehrDetailsVerfuegbar === false) {
+    showFbToast('mdToast', 'mdToastText', 'Keine zusätzlichen Details verfügbar');
+    return;
+  }
+  showView('fulltext');
+}
+
+function onOriginalClick() {
+  const a = articles[current];
+  if (!a || !a.originalUrl) { console.warn('[Curio] originalUrl fehlt für Artikel', a && a.id); return; }
+  window.open(a.originalUrl, '_blank');
+}
+
+/* Rendert `mehrDetails` robust, egal ob die Cloud Routine einen einzelnen String (mit \n\n als
+   Absatztrenner) oder ein Array von Absatz-Strings liefert — Format war zum Zeitpunkt dieser
+   Umstellung anhand der Projektdateien nicht abschließend verifizierbar (siehe Rückmeldung an Jochen). */
+function renderMehrDetailsParagraphs(a) {
+  const md = a.mehrDetails;
+  let paragraphs;
+  if (Array.isArray(md)) {
+    paragraphs = md;
+  } else if (typeof md === 'string' && md.trim()) {
+    paragraphs = md.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    if (paragraphs.length === 0) paragraphs = [md.trim()];
+  } else {
+    paragraphs = [];
+  }
+  return paragraphs.map(p => `<p>${p}</p>`).join('');
 }
 
 /* ---------- Feedback: Daumen hoch/runter (Tap = Quelle+Thema, Long-Press = Auswahl), Kommentar ---------- */
@@ -1043,10 +1105,12 @@ function openArticleWithComment(index) {
 function renderFulltext() {
   const a = articles[current];
   document.getElementById('ftReading').innerHTML = `
-    <span class="ft-badge">Simulierter Volltext · Platzhalter, bereinigt um Werbung</span>
-    <h1 class="ft-title">${a.ftTitle}</h1>
-    <div class="ft-source-meta"><span class="source-name">${a.source}</span><span class="colon">:</span> ${a.sourceContext}<span class="dot">·</span>${a.ftMeta}</div>
-    ${a.ftParagraphs.map(p => `<p>${p}</p>`).join('')}`;
+    <span class="ft-badge">Mehr Details</span>
+    <div class="eyebrow" style="margin-bottom:16px;">
+      <div class="eyebrow-cat">${a.category}</div>
+      <div class="eyebrow-source"><span class="source-name">${a.source}</span><span class="colon">:</span> ${a.sourceContext}</div>
+    </div>
+    ${renderMehrDetailsParagraphs(a)}`;
 }
 
 function showView(name) {

@@ -193,15 +193,28 @@
     font-size: 21px; line-height: 1.42; color: var(--charcoal); letter-spacing: -0.003em; margin: 0 0 16px 0;
   }
   .sheet-summary-body { font-size: 16px; line-height: 1.66; color: #3A3327; margin: 0 0 22px 0; }
-  .sheet-word-count { font-size: 12px; color: var(--charcoal-soft); opacity: 0.6; letter-spacing: 0.03em; margin-bottom: 24px; }
 
-  .sheet-actions { flex-shrink: 0; padding: 16px 48px 26px 48px; background: var(--parchment); border-top: 1px solid var(--parchment-edge); }
-  .sheet-cta {
-    max-width: 640px; width: 100%; background: var(--ink); color: var(--parchment); border: none; border-radius: 14px;
-    padding: 16px 20px; font-family: 'Libre Franklin', sans-serif; font-size: 15px; font-weight: 600;
-    letter-spacing: 0.01em; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+  .sheet-actions {
+    flex-shrink: 0; padding: 16px 48px 26px 48px; background: var(--parchment); border-top: 1px solid var(--parchment-edge);
+    display: flex; gap: 14px; position: relative;
   }
-  .sheet-cta svg { width: 15px; height: 15px; }
+  .sheet-actions-inner { max-width: 640px; width: 100%; display: flex; gap: 14px; margin: 0 auto; }
+  .sheet-cta {
+    flex: 1; width: auto; background: var(--ink); color: var(--parchment); border: none; border-radius: 14px;
+    padding: 16px 18px; font-family: 'Libre Franklin', sans-serif; font-size: 14.5px; font-weight: 600;
+    letter-spacing: 0.01em; display: flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer;
+  }
+  .sheet-cta svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .sheet-cta.disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .md-toast {
+    position: absolute; left: 48px; right: 48px; bottom: 100%; margin-bottom: 8px; z-index: 5;
+    text-align: center; opacity: 0; transition: opacity 0.25s ease; pointer-events: none;
+  }
+  .md-toast span {
+    display: inline-block; font-size: 12.5px; color: #F3EAD8;
+    background: rgba(10, 21, 36, 0.85); padding: 7px 15px; border-radius: 20px;
+  }
 
   /* ---------- Feedback: Daumen hoch/runter + Kommentar ---------- */
   .feedback-cluster { position: absolute; right: 10px; bottom: 10px; z-index: 25; display: flex; gap: 5px; }
@@ -340,10 +353,17 @@
             <button data-scope="both">Beides</button>
           </div>
           <div class="sheet-actions">
-            <button class="sheet-cta" id="sheetCta">
-              Vollständigen Artikel lesen
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
+            <div class="md-toast" id="mdToast"><span id="mdToastText"></span></div>
+            <div class="sheet-actions-inner">
+              <button class="sheet-cta" id="btnMehrDetails" onclick="onMehrDetailsClick()">
+                Mehr Details
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <button class="sheet-cta" id="btnOriginal" onclick="onOriginalClick()">
+                Original öffnen
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
           </div>
         </div>
         </div>
@@ -357,6 +377,14 @@
             </button>
           </div>
           <div class="ft-reading" id="ftReading"></div>
+          <div class="sheet-actions">
+            <div class="sheet-actions-inner">
+              <button class="sheet-cta" id="btnOriginalFt" onclick="onOriginalClick()">
+                Original öffnen
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="overview-overlay" id="overviewOverlay">
@@ -413,9 +441,9 @@
    und Lesen von articles.json normal weiter; nur das Schreiben von Feedback
    und Lesestatus wird übersprungen (Konsolen-Warnung statt Fehler).
 */
-const GITHUB_TOKEN  = "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"; // <- GitHub-Token hier eintragen, sobald erstellt
-const GITHUB_OWNER  = "JayArgh-root"; // <- dein GitHub-Benutzername/-Organisation
-const GITHUB_REPO   = "Curio-WebApp";
+const GITHUB_TOKEN  = "HIER_EINFÜGEN"; // <- GitHub-Token hier eintragen, sobald erstellt
+const GITHUB_OWNER  = "HIER_EINFÜGEN"; // <- dein GitHub-Benutzername/-Organisation
+const GITHUB_REPO   = "curio-preview";
 const GITHUB_BRANCH = "main";
 const ARTICLES_PATH = "articles.json";
 const FEEDBACK_PATH = "feedback.json";
@@ -631,17 +659,55 @@ function openSheet(index) {
       <div class="sheet-eyebrow-cat">${a.category}</div>
       <div class="sheet-eyebrow-source"><span class="source-name">${a.source}</span><span class="colon">:</span> ${a.sourceContext}</div>
     </div>
-    <p class="sheet-lead">${a.lead}</p>
+    <p class="sheet-lead">${a.headline}</p>
     <p class="sheet-summary-body">${a.summaryBody}</p>
     <div class="fb-comment-panel" id="fbCommentPanel">
       <textarea id="fbCommentInput" placeholder="Was möchtest du uns mitteilen?"></textarea>
       <button class="fb-send" id="fbCommentSend">Senden</button>
-    </div>
-    <div class="sheet-word-count">${a.wordCount}</div>`;
+    </div>`;
   document.getElementById('sheetCloseBtn').onclick = closeSheet;
-  document.getElementById('sheetCta').onclick = () => openFulltext(index);
   document.getElementById('sheetOverlay').classList.add('open');
+  updateActionButtons(a);
   initFeedback(index);
+}
+
+/* ---------- Dreistufiges Lesekonzept: Mehr Details / Original öffnen (Schritt 3, Schema-Umstellung 26.08.2026) ---------- */
+function updateActionButtons(a) {
+  const btnMehr = document.getElementById('btnMehrDetails');
+  if (btnMehr) btnMehr.classList.toggle('disabled', a.mehrDetailsVerfuegbar === false);
+}
+
+function onMehrDetailsClick() {
+  const a = articles[currentSheetIndex];
+  if (!a) return;
+  if (a.mehrDetailsVerfuegbar === false) {
+    showFbToast('mdToast', 'mdToastText', 'Keine zusätzlichen Details verfügbar');
+    return;
+  }
+  openFulltext(currentSheetIndex);
+}
+
+function onOriginalClick() {
+  const a = articles[currentSheetIndex];
+  if (!a || !a.originalUrl) { console.warn('[Curio] originalUrl fehlt für Artikel', a && a.id); return; }
+  window.open(a.originalUrl, '_blank');
+}
+
+/* Rendert `mehrDetails` robust, egal ob die Cloud Routine einen einzelnen String (mit \n\n als
+   Absatztrenner) oder ein Array von Absatz-Strings liefert — Format war zum Zeitpunkt dieser
+   Umstellung anhand der Projektdateien nicht abschließend verifizierbar (siehe Rückmeldung an Jochen). */
+function renderMehrDetailsParagraphs(a) {
+  const md = a.mehrDetails;
+  let paragraphs;
+  if (Array.isArray(md)) {
+    paragraphs = md;
+  } else if (typeof md === 'string' && md.trim()) {
+    paragraphs = md.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    if (paragraphs.length === 0) paragraphs = [md.trim()];
+  } else {
+    paragraphs = [];
+  }
+  return paragraphs.map(p => `<p>${p}</p>`).join('');
 }
 
 function closeSheet() {
@@ -657,10 +723,12 @@ function openFulltext(index) {
   const a = articles[index];
   document.getElementById('ftReading').innerHTML = `
     <div class="ft-reading-inner">
-      <span class="ft-badge">Simulierter Volltext · Platzhalter, bereinigt um Werbung</span>
-      <h1 class="ft-title">${a.ftTitle}</h1>
-      <div class="ft-source-meta"><span class="source-name">${a.source}</span><span class="colon">:</span> ${a.sourceContext}<span class="dot">·</span>${a.ftMeta}</div>
-      ${a.ftParagraphs.map(p => `<p>${p}</p>`).join('')}
+      <span class="ft-badge">Mehr Details</span>
+      <div class="sheet-eyebrow" style="margin-bottom:18px;">
+        <div class="sheet-eyebrow-cat">${a.category}</div>
+        <div class="sheet-eyebrow-source"><span class="source-name">${a.source}</span><span class="colon">:</span> ${a.sourceContext}</div>
+      </div>
+      ${renderMehrDetailsParagraphs(a)}
     </div>`;
   document.getElementById('fulltextSheet').classList.add('open');
 }
